@@ -1,5 +1,4 @@
 <?php
-
 /*
  * This file is part of tabulapdf-php-wrapper
  *
@@ -8,14 +7,11 @@
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
-
 namespace Davincho\Tabula;
-
 use Symfony\Component\Process\Exception\InvalidArgumentException;
 use Symfony\Component\Process\Exception\RuntimeException;
 use Symfony\Component\Process\ExecutableFinder;
-use Symfony\Component\Process\ProcessBuilder;
-
+use Symfony\Component\Process\Process;
 class Tabula
 {
     /**
@@ -23,23 +19,19 @@ class Tabula
      * @var
      */
     private $file = null;
-
     /**
      * Additional dir to check for java executable
      * @var
      */
     private $binDir = [];
-
     /**
      * Locale variable for console command
      */
     private $locale = null;
-
     /**
      * Path to jar file
      */
     private $jarArchive = __DIR__ . '/../../../lib/tabula-1.0.1-jar-with-dependencies.jar';
-
     /**
      * Converter constructor.
      * @param null $file
@@ -48,16 +40,13 @@ class Tabula
     public function __construct($file = null, $binDir = null, $locale = null)
     {
         $this->file = $file;
-
         if($binDir) {
             $this->binDir = is_array($binDir) ? $binDir : [$binDir];
         }
-
         if($locale) {
             $this->locale = $locale;
         }
     }
-
     /**
      * @return mixed
      */
@@ -65,7 +54,6 @@ class Tabula
     {
         return $this->locale;
     }
-
     /**
      * @param mixed $locale
      */
@@ -73,7 +61,6 @@ class Tabula
     {
         $this->locale = $locale;
     }
-
     /**
      * @return mixed
      */
@@ -81,7 +68,6 @@ class Tabula
     {
         return $this->file;
     }
-
     /**
      * @param mixed $file
      */
@@ -89,7 +75,6 @@ class Tabula
     {
         $this->file = $file;
     }
-
     /**
      * @return string
      */
@@ -97,7 +82,6 @@ class Tabula
     {
         return $this->jarArchive;
     }
-
     /**
      * @param string $jarArchive
      */
@@ -105,7 +89,6 @@ class Tabula
     {
         $this->jarArchive = $jarArchive;
     }
-
     /**
      * @return mixed
      */
@@ -113,7 +96,6 @@ class Tabula
     {
         return $this->binDir;
     }
-
     /**
      * @param mixed $binDir
      */
@@ -121,44 +103,34 @@ class Tabula
     {
         $this->binDir = $binDir;
     }
-
     public function parse($parameters = [], $file = null, $utf8Encode = true)
     {
         $inputFile = $file !== null ? $file : $this->file;
         $parameters = is_array($parameters) ? $parameters : [$parameters];
-
         if ($inputFile === null || !file_exists($inputFile) || !is_readable($inputFile)) {
             throw new InvalidArgumentException('File is null, not existent or not readable');
         }
-
         $finder = new ExecutableFinder();
         $binary = $finder->find('java', null, $this->binDir);
-
         if ($binary === null) {
             throw new RuntimeException('Could not find java on your system');
         }
-
         // Jar binary, with additional java option (see https://github.com/tabulapdf/tabula-java/issues/26)
         $arguments = ['-Xss2m', '-jar', $this->getJarArchive(), $inputFile];
-
         if($utf8Encode) {
             array_splice( $arguments, 2, 0, '-Dfile.encoding=utf-8' );
         }
-
-        $processBuilder = new ProcessBuilder();
-        if($this->locale) {
-            $processBuilder->setEnv('LC_ALL', $this->locale);
+        $envVars = [];
+        if ($this->locale) {
+            $envVars['LC_ALL'] = $this->locale;
         }
-        $processBuilder->setPrefix($binary)
-            ->setArguments(array_merge($arguments, $parameters));
-
-        $process = $processBuilder->getProcess();
+        $process = new Process(array_merge([$binary], $arguments, $parameters), null, [
+            $envVars
+        ]);
         $process->run();
-
         if (!$process->isSuccessful()) {
             throw new RuntimeException($process->getErrorOutput());
         }
-
         return $process->getOutput();
     }
 }
